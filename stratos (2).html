@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Stratos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#eef9f8;
+    --ink-dim:#9db3c2;
+    --ink-faint:#5b7080;
+    --cyan:#7fe8e0;
+    --cyan-soft:#cffffb;
+    --lime:#c8f26b;
+    --amber:#ffb454;
+    --danger:#ff6b6b;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0;
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#04060c;
+    font-family:'Manrope', sans-serif;
+    color:var(--ink);
+    -webkit-user-select:none;
+    user-select:none;
+    touch-action:none;
+  }
+
+  #stage{
+    position:relative;
+    width:100vw; height:100vh;
+  }
+
+  canvas{ display:block; width:100%; height:100%; }
+
+  .hud{
+    position:absolute;
+    top:0; left:0; right:0;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding:26px clamp(20px,4vw,46px);
+    pointer-events:none;
+    font-family:'Space Grotesk', sans-serif;
+    z-index:5;
+  }
+
+  .altitude-block{ display:flex; flex-direction:column; gap:12px; min-width:220px; }
+
+  .alt-row{ display:flex; align-items:baseline; gap:16px; }
+
+  .alt-row .label{
+    font-family:'Manrope', sans-serif;
+    font-size:11px; color:var(--ink-dim); font-weight:500;
+  }
+
+  .alt-row .value{
+    font-size:clamp(26px,4vw,36px);
+    font-weight:600;
+    color:var(--cyan-soft);
+    font-variant-numeric:tabular-nums;
+    line-height:1;
+  }
+
+  .alt-row .unit{ font-size:14px; color:var(--ink-dim); font-weight:500; margin-left:2px; }
+
+  .best-row{ display:flex; align-items:baseline; gap:8px; }
+  .best-row .label{ font-family:'Manrope',sans-serif; font-size:11px; color:var(--ink-faint); }
+  .best-row .value{ font-size:14px; color:var(--ink-dim); font-variant-numeric:tabular-nums; font-weight:600; }
+
+  .bars{ display:flex; flex-direction:column; gap:7px; width:180px; margin-top:4px; }
+
+  .bar-row{ display:flex; align-items:center; gap:8px; }
+
+  .bar-label{ font-family:'Manrope',sans-serif; font-size:10px; color:var(--ink-faint); width:34px; letter-spacing:0.02em; }
+
+  .bar-track{
+    flex:1; height:6px; border-radius:100px;
+    background:rgba(255,255,255,0.08);
+    overflow:hidden;
+  }
+
+  .bar-fill{
+    height:100%; border-radius:100px;
+    transition:background 0.4s ease;
+  }
+
+  #hullFill{ background:var(--cyan); width:100%; }
+  #fuelFill{ background:var(--lime); width:100%; }
+
+  .bar-fill.critical{ animation: pulseWarn 0.65s ease-in-out infinite; }
+  @keyframes pulseWarn{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+
+  .accuracy-block{
+    text-align:right;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .accuracy-block .label{ font-family:'Manrope',sans-serif; font-size:11px; color:var(--ink-dim); font-weight:500; }
+  .accuracy-block .value{ font-size:20px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .layer-banner{
+    position:absolute;
+    top:38%;
+    left:0; right:0;
+    text-align:center;
+    pointer-events:none;
+    z-index:4;
+    opacity:0;
+    transition:opacity 1s ease, transform 1s ease;
+    transform:translateY(8px);
+  }
+  .layer-banner.show{ opacity:1; transform:translateY(0); }
+  .layer-banner .tag{
+    font-family:'Manrope', sans-serif;
+    font-size:11px; letter-spacing:0.06em;
+    color:var(--ink-faint);
+    margin-bottom:6px;
+  }
+  .layer-banner .name{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(24px,4vw,34px);
+    font-weight:600;
+    color:var(--ink);
+    text-shadow:0 0 30px rgba(127,232,224,0.35);
+  }
+
+  .controls-row{
+    position:absolute;
+    bottom:26px; left:0; right:0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:14px;
+    pointer-events:none;
+    z-index:5;
+    transition:opacity 1s ease;
+  }
+
+  .key{
+    display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px;
+    border-radius:8px;
+    background:rgba(238,249,248,0.08);
+    border:1px solid rgba(238,249,248,0.16);
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px;
+    color:var(--ink-dim);
+  }
+  .key.wide{ width:auto; padding:0 16px; font-size:12px; letter-spacing:0.03em; }
+  .key.active{
+    background:rgba(127,232,224,0.22);
+    border-color:rgba(127,232,224,0.5);
+    color:var(--cyan-soft);
+  }
+  .key.boost.active{
+    background:rgba(255,180,84,0.22);
+    border-color:rgba(255,180,84,0.5);
+    color:var(--amber);
+  }
+  .controls-label{
+    font-size:12px; color:var(--ink-faint); margin-right:6px;
+  }
+
+  .overlay{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    z-index:10;
+    background:radial-gradient(ellipse at 50% 40%, rgba(20,30,55,0.55) 0%, rgba(4,6,12,0.9) 72%);
+    cursor:pointer;
+    transition:opacity 0.5s ease;
+  }
+  .overlay.hidden{ opacity:0; pointer-events:none; }
+
+  .panel{ text-align:center; max-width:460px; padding:0 24px; }
+
+  .panel .kicker{ font-size:12px; color:var(--cyan); letter-spacing:0.08em; margin-bottom:14px; font-weight:600; }
+
+  .panel h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(40px,8vw,58px);
+    font-weight:700; margin:0 0 14px 0; letter-spacing:-0.01em;
+    background:linear-gradient(180deg, var(--ink) 0%, var(--ink-dim) 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+
+  .panel p.sub{ font-size:15px; color:var(--ink-dim); line-height:1.65; margin:0 0 22px 0; }
+
+  .keyhint{
+    display:flex; justify-content:center; gap:10px; margin-bottom:30px;
+  }
+
+  .panel .cta{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:14px; font-weight:600; color:#04060c;
+    background:var(--cyan);
+    display:inline-block; padding:13px 28px; border-radius:100px;
+    letter-spacing:0.01em;
+    box-shadow:0 0 30px rgba(127,232,224,0.4);
+  }
+
+  .results{ display:flex; justify-content:center; gap:clamp(18px,5vw,36px); margin-bottom:32px; flex-wrap:wrap; }
+  .results .stat{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .results .stat .label{ font-family:'Manrope',sans-serif; font-size:11px; color:var(--ink-dim); }
+  .results .stat .value{ font-family:'Space Grotesk', sans-serif; font-size:30px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .newbest{
+    display:inline-block; font-size:11px; font-weight:600; color:#04060c;
+    background:var(--lime); padding:3px 10px; border-radius:100px; margin-bottom:16px; letter-spacing:0.02em;
+  }
+
+  @media (max-width:520px){
+    .hud{ padding:18px 16px; }
+    .bars{ width:140px; }
+  }
+
+  /* ---------- On-screen steer/boost buttons ---------- */
+  .mobile-controls{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    display:none;
+    justify-content:space-between;
+    align-items:flex-end;
+    padding:0 22px calc(24px + env(safe-area-inset-bottom,0px));
+    z-index:20;
+    pointer-events:none;
+  }
+  .mobile-controls.visible{ display:flex; }
+
+  .mc-steer{ display:flex; gap:16px; pointer-events:auto; }
+
+  .mc-btn{
+    width:66px; height:66px;
+    border-radius:50%;
+    background:rgba(238,249,248,0.1);
+    border:1px solid rgba(238,249,248,0.22);
+    color:var(--ink);
+    font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:none;
+    user-select:none;
+    font-family:'Space Grotesk', sans-serif;
+    backdrop-filter: blur(4px);
+  }
+  .mc-btn.pressed{
+    background:rgba(127,232,224,0.3);
+    border-color:rgba(127,232,224,0.65);
+  }
+
+  .mc-boost{
+    width:82px; height:82px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.03em;
+    background:rgba(255,180,84,0.12);
+    border-color:rgba(255,180,84,0.32);
+    pointer-events:auto;
+  }
+  .mc-boost.pressed{
+    background:rgba(255,180,84,0.34);
+    border-color:rgba(255,180,84,0.75);
+  }
+
+  @media (max-width:640px){
+    .controls-row{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div class="hud" id="hud">
+    <div class="altitude-block">
+      <div class="alt-row">
+        <span class="label">Altitude</span>
+        <span class="value" id="altVal">0</span><span class="unit">m</span>
+      </div>
+      <div class="best-row">
+        <span class="label">Best</span>
+        <span class="value" id="bestVal">0 m</span>
+      </div>
+      <div class="bars">
+        <div class="bar-row">
+          <span class="bar-label">Hull</span>
+          <div class="bar-track"><div class="bar-fill" id="hullFill"></div></div>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Fuel</span>
+          <div class="bar-track"><div class="bar-fill" id="fuelFill"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="accuracy-block">
+      <span class="label">Accuracy</span>
+      <span class="value" id="accVal">100%</span>
+    </div>
+  </div>
+
+  <div class="layer-banner" id="layerBanner">
+    <div class="tag">ENTERING</div>
+    <div class="name" id="layerName">Troposphere</div>
+  </div>
+
+  <div class="layer-banner" id="controlBanner" style="top:52%;">
+    <div class="tag" style="color:var(--danger);">GRAVITY WELL</div>
+    <div class="name">Out of control</div>
+  </div>
+
+  <div class="layer-banner" id="nebulaBanner" style="top:45%;">
+    <div class="tag" style="color:var(--lime);">3 IN 4</div>
+    <div class="name">Escaped the nebula</div>
+  </div>
+
+  <div class="layer-banner" id="empBanner" style="top:45%;">
+    <div class="tag" style="color:var(--amber);">EMP PULSE</div>
+    <div class="name">Controls inverted</div>
+  </div>
+
+  <div class="controls-row" id="controlsRow">
+    <span class="controls-label">Steer</span>
+    <div class="key" id="keyLeft">&#8592;</div>
+    <div class="key" id="keyRight">&#8594;</div>
+    <div class="key wide boost" id="keyBoost">SPACE · BOOST</div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="panel">
+      <div class="kicker">A VERTICAL CLIMB</div>
+      <h1>Stratos</h1>
+      <p class="sub">A real rocket, climbing on thrust alone. Steer with the arrow keys or the on-screen buttons, hold boost to punch through gaps, watch for gravity wells that'll spin you out, and brace when the sky flashes. Wormholes will warp you somewhere random on screen — good luck or bad, your call whether to risk one. Grab a magnet and nearby fuel gets pulled straight to you for a few seconds. Past 3,000m, a nebula blast waits — most rockets make it through, but not all. Past 9,000m, an EMP pulse will scramble your controls for a few seconds. Keep an eye on your fuel too — it burns fast.</p>
+      <div class="keyhint">
+        <div class="key">&#8592;</div>
+        <div class="key">&#8594;</div>
+        <div class="key wide boost">SPACE · BOOST</div>
+      </div>
+      <span class="cta">Tap to ignite</span>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overOverlay">
+    <div class="panel">
+      <div id="newBestBadge" class="newbest" style="display:none;">New best altitude</div>
+      <h1 id="overTitle">Hull Breached</h1>
+      <p class="sub" id="overSub">One too many impacts.</p>
+      <div class="results">
+        <div class="stat"><span class="label">Altitude</span><span class="value" id="finalAlt">0 m</span></div>
+        <div class="stat"><span class="label">Best</span><span class="value" id="finalBest">0 m</span></div>
+        <div class="stat"><span class="label">Accuracy</span><span class="value" id="finalAcc">100%</span></div>
+      </div>
+      <span class="cta">Tap to fly again</span>
+    </div>
+  </div>
+
+  <div class="mobile-controls" id="mobileControls">
+    <div class="mc-steer">
+      <button class="mc-btn" id="btnLeft" aria-label="Steer left">&#8592;</button>
+      <button class="mc-btn" id="btnRight" aria-label="Steer right">&#8594;</button>
+    </div>
+    <button class="mc-btn mc-boost" id="btnBoost" aria-label="Boost">BOOST</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  const altVal = document.getElementById('altVal');
+  const bestVal = document.getElementById('bestVal');
+  const accVal = document.getElementById('accVal');
+  const hullFill = document.getElementById('hullFill');
+  const fuelFill = document.getElementById('fuelFill');
+  const layerBanner = document.getElementById('layerBanner');
+  const layerName = document.getElementById('layerName');
+  const controlBanner = document.getElementById('controlBanner');
+  const nebulaBanner = document.getElementById('nebulaBanner');
+  const empBanner = document.getElementById('empBanner');
+  const hudEl = document.getElementById('hud');
+
+  const keyLeftEl = document.getElementById('keyLeft');
+  const keyRightEl = document.getElementById('keyRight');
+  const keyBoostEl = document.getElementById('keyBoost');
+  const controlsRow = document.getElementById('controlsRow');
+
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const overTitle = document.getElementById('overTitle');
+  const overSub = document.getElementById('overSub');
+  const finalAlt = document.getElementById('finalAlt');
+  const finalBest = document.getElementById('finalBest');
+  const finalAcc = document.getElementById('finalAcc');
+  const newBestBadge = document.getElementById('newBestBadge');
+
+  let W = 0, H = 0, DPR = 1;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Persistent best altitude ----------
+  let bestAlt = 0;
+  const STORAGE_KEY = 'stratos-best-altitude';
+
+  async function loadBest(){
+    try{
+      const res = await window.storage.get(STORAGE_KEY, false);
+      if(res && res.value){
+        const n = parseInt(res.value, 10);
+        if(!isNaN(n)) bestAlt = n;
+      }
+    }catch(e){}
+    bestVal.textContent = bestAlt + ' m';
+  }
+  async function saveBest(){
+    try{ await window.storage.set(STORAGE_KEY, String(bestAlt), false); }catch(e){}
+  }
+  loadBest();
+
+  // ---------- Keyboard input ----------
+  const keys = { left:false, right:false, boost:false };
+
+  function handleKey(e, isDown){
+    if(e.code === 'ArrowLeft' || e.code === 'KeyA'){ keys.left = isDown; e.preventDefault(); keyLeftEl.classList.toggle('active', isDown); }
+    else if(e.code === 'ArrowRight' || e.code === 'KeyD'){ keys.right = isDown; e.preventDefault(); keyRightEl.classList.toggle('active', isDown); }
+    else if(e.code === 'Space'){ keys.boost = isDown; e.preventDefault(); keyBoostEl.classList.toggle('active', isDown); }
+    else return;
+
+    if(!running && isDown && (startOverlay && !startOverlay.classList.contains('hidden'))){
+      startGame();
+    }
+  }
+  window.addEventListener('keydown', (e)=> handleKey(e, true));
+  window.addEventListener('keyup', (e)=> handleKey(e, false));
+
+  // release everything if focus is lost, so a stray touch/key never gets stuck "held"
+  window.addEventListener('blur', ()=>{
+    keys.left = false; keys.right = false; keys.boost = false;
+    keyLeftEl.classList.remove('active');
+    keyRightEl.classList.remove('active');
+    keyBoostEl.classList.remove('active');
+    btnLeft.classList.remove('pressed');
+    btnRight.classList.remove('pressed');
+    btnBoost.classList.remove('pressed');
+  });
+
+  // ---------- On-screen mobile controls ----------
+  const mobileControls = document.getElementById('mobileControls');
+  const btnLeft = document.getElementById('btnLeft');
+  const btnRight = document.getElementById('btnRight');
+  const btnBoost = document.getElementById('btnBoost');
+
+  function overlayVisible(){
+    return !startOverlay.classList.contains('hidden') || !overOverlay.classList.contains('hidden');
+  }
+
+  function bindHoldButton(el, apply, keyIndicatorEl){
+    const press = (e)=>{
+      e.preventDefault();
+      if(overlayVisible()){ startGame(); return; }
+      apply(true);
+      el.classList.add('pressed');
+      if(keyIndicatorEl) keyIndicatorEl.classList.add('active');
+    };
+    const release = (e)=>{
+      e.preventDefault();
+      apply(false);
+      el.classList.remove('pressed');
+      if(keyIndicatorEl) keyIndicatorEl.classList.remove('active');
+    };
+    el.addEventListener('pointerdown', press);
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
+    el.addEventListener('contextmenu', (e)=> e.preventDefault());
+  }
+
+  bindHoldButton(btnLeft,  v => keys.left  = v, keyLeftEl);
+  bindHoldButton(btnRight, v => keys.right = v, keyRightEl);
+  bindHoldButton(btnBoost, v => keys.boost = v, keyBoostEl);
+
+  // ---------- Layers ----------
+  const LAYERS = [
+    { name:'Troposphere', from:0,    to:1000, top:'#25335e', bottom:'#ff9d6c' },
+    { name:'Stratosphere', from:1000, to:2500, top:'#0a1440', bottom:'#4f7cff' },
+    { name:'Mesosphere',  from:2500, to:4500, top:'#160a2c', bottom:'#5b2a86' },
+    { name:'Exosphere',   from:4500, to:Infinity, top:'#020208', bottom:'#0b0c1e' }
+  ];
+
+  function hexToRgb(hex){
+    const n = parseInt(hex.slice(1),16);
+    return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+  }
+  function lerpColor(c1,c2,t){
+    return { r: Math.round(c1.r+(c2.r-c1.r)*t), g: Math.round(c1.g+(c2.g-c1.g)*t), b: Math.round(c1.b+(c2.b-c1.b)*t) };
+  }
+  function rgbStr(c){ return `rgb(${c.r},${c.g},${c.b})`; }
+  const LAYER_COLORS = LAYERS.map(l => ({ top: hexToRgb(l.top), bottom: hexToRgb(l.bottom) }));
+
+  function getLayerIndex(alt){
+    for(let i=0;i<LAYERS.length;i++){ if(alt < LAYERS[i].to) return i; }
+    return LAYERS.length-1;
+  }
+
+  function getSkyColors(alt){
+    const idx = getLayerIndex(alt);
+    const layer = LAYERS[idx];
+    const span = layer.to - layer.from;
+    const localT = span === Infinity ? 0 : Math.min(1, (alt-layer.from)/span);
+    const blendStart = 0.75;
+    if(localT > blendStart && idx < LAYERS.length-1){
+      const t = (localT-blendStart)/(1-blendStart);
+      const cur = LAYER_COLORS[idx], next = LAYER_COLORS[idx+1];
+      return { top: rgbStr(lerpColor(cur.top,next.top,t)), bottom: rgbStr(lerpColor(cur.bottom,next.bottom,t)) };
+    }
+    return { top: rgbStr(LAYER_COLORS[idx].top), bottom: rgbStr(LAYER_COLORS[idx].bottom) };
+  }
+
+  function getWeights(alt){
+    const idx = getLayerIndex(alt);
+    const tropo = idx===0 ? 1 : Math.max(0, 1-(alt-1000)/500);
+    const meso = Math.max(0, 1-Math.abs(alt-3500)/2000);
+    const exo = idx===3 ? Math.min(1,(alt-4500)/1500) : 0;
+    return { tropo: Math.max(0,Math.min(1,tropo)), meso: Math.max(0,Math.min(1,meso)), exo: Math.max(0,Math.min(1,exo)) };
+  }
+
+  // ---------- Ambient decoration ----------
+  const clouds = [];
+  const stars = [];
+  function initDecor(){
+    clouds.length = 0; stars.length = 0;
+    for(let i=0;i<14;i++){ clouds.push({ x:Math.random()*W, y:Math.random()*H, w:120+Math.random()*160, h:34+Math.random()*22, speed:0.35+Math.random()*0.2 }); }
+    for(let i=0;i<160;i++){ stars.push({ x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.3+0.3, phase:Math.random()*Math.PI*2, tw:0.5+Math.random()*1.2, speed:0.15+Math.random()*0.35 }); }
+  }
+  initDecor();
+  window.addEventListener('resize', initDecor);
+
+  const speedLines = [];
+  function initSpeedLines(){
+    speedLines.length = 0;
+    for(let i=0;i<22;i++){ speedLines.push({ x:Math.random()*W, y:Math.random()*H, len:20+Math.random()*40, speed:0.6+Math.random()*0.6 }); }
+  }
+  initSpeedLines();
+  window.addEventListener('resize', initSpeedLines);
+
+  // ---------- Rocket ----------
+  const rocket = { x:0, y:0, vx:0, bank:0, radius:16, invulnerable:0, outOfControl:0, spin:0, magnetTime:0, trailPoints:[] };
+  const ACCEL = 1000, MAX_VX = 430, DRAG = 5.5;
+
+  function resetRocket(){
+    rocket.x = W/2; rocket.y = H*0.72;
+    rocket.vx = 0; rocket.bank = 0; rocket.invulnerable = 1.2;
+    rocket.outOfControl = 0; rocket.spin = 0; rocket.magnetTime = 0;
+    rocket.trailPoints = [];
+  }
+
+  let flame = [], bursts = [], sparkles = [];
+
+  // ---------- Obstacles & fuel ----------
+  let obstacles = [], fuels = [];
+
+  function makeRockShape(radius){
+    const points = [];
+    const segs = 8+Math.floor(Math.random()*4);
+    for(let i=0;i<segs;i++){ const a=(i/segs)*Math.PI*2; const r=radius*(0.78+Math.random()*0.4); points.push({a,r}); }
+    return points;
+  }
+
+  function addRock(x,y,opts){
+    opts = opts || {};
+    const radius = opts.radius || (16+Math.random()*16);
+    obstacles.push({ x,y, radius, vx: opts.vx||0, vy: opts.vy||0, rotation:Math.random()*Math.PI*2, rotSpeed:(Math.random()-0.5)*1.2, shape:makeRockShape(radius), damage:16+radius*0.35, resolved:false });
+  }
+
+  function spawnPattern(alt, speed){
+    const pool = ['single','single'];
+    if(alt > 900) pool.push('gate','gate');
+    if(alt > 2300) pool.push('diagonal');
+    if(alt > 4300) pool.push('cluster');
+    const pick = pool[Math.floor(Math.random()*pool.length)];
+    const topY = -60;
+
+    if(pick === 'single'){
+      const x = 60+Math.random()*(W-120);
+      addRock(x, topY, { vy:speed, radius:24+Math.random()*24 });
+    } else if(pick === 'gate'){
+      const gap = Math.max(175, 225-alt*0.008);
+      const center = gap/2+40+Math.random()*(W-gap-80);
+      const rL=28+Math.random()*18, rR=28+Math.random()*18;
+      addRock(center-gap/2-rL, topY, { vy:speed, radius:rL });
+      addRock(center+gap/2+rR, topY, { vy:speed, radius:rR });
+    } else if(pick === 'diagonal'){
+      const fromLeft = Math.random()<0.5;
+      const x = fromLeft ? -30 : W+30;
+      const vx = fromLeft ? (60+Math.random()*50) : -(60+Math.random()*50);
+      addRock(x, topY-Math.random()*80, { vy:speed*0.9, vx, radius:24+Math.random()*20 });
+    } else if(pick === 'cluster'){
+      const baseX = 100+Math.random()*(W-200);
+      const n = 3+Math.floor(Math.random()*2);
+      for(let i=0;i<n;i++){
+        const ox = (i-(n-1)/2)*(74+Math.random()*24);
+        const oy = -Math.random()*90;
+        addRock(baseX+ox, topY+oy, { vy:speed*(0.95+Math.random()*0.1), radius:20+Math.random()*16 });
+      }
+    }
+  }
+
+  function spawnFuel(){
+    const x = 60+Math.random()*(W-120);
+    fuels.push({ x, y:-40, radius:15, vy:0, pulse:Math.random()*Math.PI*2 });
+  }
+
+  // ---------- Black holes ----------
+  // A large, dramatic hazard that eats up nearly half the width of the
+  // screen — but it's always anchored to one side, leaving a guaranteed
+  // open lane on the other for the rocket to slip through.
+  let blackholes = [];
+
+  function spawnBlackHole(speed){
+    const margin = 170; // guaranteed clear lane width on the open side
+    const radius = Math.min(W*0.24, (W-margin)/2);
+    const side = Math.random() < 0.5 ? 'left' : 'right';
+    const x = side === 'left' ? radius*0.9 : W - radius*0.9;
+    blackholes.push({
+      x, baseX:x, y:-radius*1.6, radius,
+      vy: speed*0.52,
+      swirl: Math.random()*Math.PI*2,
+      age: Math.random()*10,
+      resolved:false
+    });
+  }
+
+  // ---------- Wormholes ----------
+  // A swirling portal, moderate size, always dodgeable — but flying
+  // into one instantly warps the rocket to a random x position on
+  // screen. Could save you, could drop you right next to trouble.
+  let wormholes = [];
+
+  function spawnWormhole(speed){
+    const radius = 28 + Math.random()*14;
+    const x = 80 + Math.random()*(W-160);
+    wormholes.push({
+      x, y:-70, radius,
+      vy: speed*0.85,
+      swirl: Math.random()*Math.PI*2,
+      resolved:false
+    });
+  }
+
+  let warpFlash = null; // { x, y, t } transient teleport-in/out ripple
+
+  // ---------- Magnets ----------
+  // A rare pickup — for a few seconds after grabbing one, nearby fuel
+  // canisters get pulled toward the rocket instead of just falling past.
+  let magnets = [];
+  const MAGNET_DURATION = 7;
+  const MAGNET_RADIUS = 230;
+  const MAGNET_PULL = 620;
+
+  function spawnMagnet(){
+    const x = 70 + Math.random()*(W-140);
+    magnets.push({ x, y:-40, radius:15, pulse:Math.random()*Math.PI*2 });
+  }
+
+  // ---------- Game state ----------
+  let altitude = 0;
+  let baseScrollSpeed = 150;
+  let dodges = 0, hits = 0;
+  let hull = 100, HULL_MAX = 100;
+  let fuel = 100, FUEL_MAX = 100;
+  const FUEL_DRAIN_PER_SEC = FUEL_MAX / 26;   // fast base burn: full tank ~26s
+  const BOOST_EXTRA_DRAIN  = FUEL_MAX / 9;    // boosting drains much faster on top of base burn
+  const BOOST_MULT = 1.85;
+  const HULL_REGEN_DELAY = 3.0;
+  const HULL_REGEN_RATE = 7;
+  let timeSinceHit = 999;
+
+  let spawnTimer = 0, spawnInterval = 1.1;
+  let fuelTimer = 0, fuelInterval = 6;
+  let blackHoleTimer = 0, blackHoleInterval = 22 + Math.random()*10;
+  let wormHoleTimer = 0, wormHoleInterval = 13 + Math.random()*9;
+  let magnetTimer = 0, magnetInterval = 28 + Math.random()*16;
+
+  // Lightning storms: a rare, whole-screen event — a warning flicker,
+  // a bright multi-bolt flash, then the view blurs and slowly clears.
+  const STORM_WARN = 0.65, STORM_FLASH = 0.35, STORM_BLUR = 2.4;
+  const STORM_TOTAL = STORM_WARN + STORM_FLASH + STORM_BLUR;
+  const STORM_MAX_BLUR = 9;
+  let stormTimer = 0, stormInterval = 20 + Math.random()*14;
+  let storm = { active:false, t:0 };
+
+  // Nebula blast: a single scripted event once you cross 3000m. It is
+  // almost always fatal by design — a 1% chance to slip through the
+  // shockwave alive, 99% chance it ends the run right there.
+  const NEBULA_TRIGGER_ALT = 3000;
+  const NEBULA_WARN = 0.5, NEBULA_EXPAND = 1.5, NEBULA_OUTRO = 0.6;
+  const NEBULA_ESCAPE_CHANCE = 0.75;
+  let nebulaTriggered = false;
+  let nebula = { active:false, t:0, resolved:false, survived:false };
+
+  // EMP shockwave: a single scripted event once you cross 9000m. Not
+  // fatal — just deeply irritating: controls invert and the screen
+  // glitches with static for a few seconds.
+  const EMP_TRIGGER_ALT = 9000;
+  const EMP_WARN = 0.4, EMP_EFFECT = 4.5;
+  const EMP_TOTAL = EMP_WARN + EMP_EFFECT;
+  let empTriggered = false;
+  let emp = { active:false, t:0 };
+
+  let running = false;
+  let shake = 0;
+  let last = performance.now();
+  let shownLayers = new Set();
+
+  function accuracy(){
+    const total = dodges+hits;
+    if(total===0) return 100;
+    return Math.round((dodges/total)*100);
+  }
+
+  function updateHud(){
+    altVal.textContent = Math.floor(altitude);
+    bestVal.textContent = Math.floor(bestAlt)+' m';
+    accVal.textContent = accuracy()+'%';
+    hullFill.style.width = Math.max(0,hull)+'%';
+    fuelFill.style.width = Math.max(0,fuel)+'%';
+    hullFill.style.background = hull<30 ? 'var(--danger)' : (hull<60 ? 'var(--amber)' : 'var(--cyan)');
+    fuelFill.style.background = fuel<25 ? 'var(--danger)' : 'var(--lime)';
+    fuelFill.classList.toggle('critical', fuel>0 && fuel<20);
+  }
+
+  function maybeShowLayerBanner(){
+    const idx = getLayerIndex(altitude);
+    if(idx>0 && !shownLayers.has(idx) && altitude > LAYERS[idx].from+10){
+      shownLayers.add(idx);
+      layerName.textContent = LAYERS[idx].name;
+      layerBanner.classList.add('show');
+      setTimeout(()=> layerBanner.classList.remove('show'), 2600);
+    }
+  }
+
+  function startGame(){
+    altitude = 0; baseScrollSpeed = 150;
+    dodges = 0; hits = 0;
+    hull = HULL_MAX; fuel = FUEL_MAX;
+    timeSinceHit = 999;
+    spawnTimer = 0; spawnInterval = 1.1;
+    fuelTimer = 0; fuelInterval = 6;
+    blackHoleTimer = 0; blackHoleInterval = 22 + Math.random()*10;
+    wormHoleTimer = 0; wormHoleInterval = 13 + Math.random()*9;
+    magnetTimer = 0; magnetInterval = 28 + Math.random()*16;
+    stormTimer = 0; stormInterval = 20 + Math.random()*14;
+    storm = { active:false, t:0 };
+    nebulaTriggered = false;
+    nebula = { active:false, t:0, resolved:false, survived:false };
+    empTriggered = false;
+    emp = { active:false, t:0 };
+    canvas.style.filter = '';
+    warpFlash = null;
+    obstacles = []; fuels = []; bursts = []; sparkles = []; flame = []; blackholes = []; wormholes = []; magnets = [];
+    shownLayers = new Set();
+    resetRocket();
+    running = true;
+    startOverlay.classList.add('hidden');
+    overOverlay.classList.add('hidden');
+    controlsRow.style.opacity = '1';
+    mobileControls.classList.add('visible');
+    updateHud();
+    last = performance.now();
+  }
+
+  function endGame(cause){
+    running = false;
+    mobileControls.classList.remove('visible');
+    keys.left = false; keys.right = false; keys.boost = false;
+    keyLeftEl.classList.remove('active');
+    keyRightEl.classList.remove('active');
+    keyBoostEl.classList.remove('active');
+    btnLeft.classList.remove('pressed');
+    btnRight.classList.remove('pressed');
+    btnBoost.classList.remove('pressed');
+    const isNewBest = Math.floor(altitude) > bestAlt;
+    if(isNewBest){ bestAlt = Math.floor(altitude); saveBest(); }
+    if(cause === 'fuel'){
+      overTitle.textContent = 'Out of Fuel';
+      overSub.textContent = 'The engine cut out over open sky.';
+    } else if(cause === 'nebula'){
+      overTitle.textContent = 'Consumed by the Nebula';
+      overSub.textContent = 'The blast wave swallowed the sky. The odds were never good.';
+    } else {
+      overTitle.textContent = 'Hull Breached';
+      overSub.textContent = 'One too many impacts.';
+    }
+    finalAlt.textContent = Math.floor(altitude)+' m';
+    finalBest.textContent = Math.floor(bestAlt)+' m';
+    finalAcc.textContent = accuracy()+'%';
+    newBestBadge.style.display = isNewBest ? 'inline-block' : 'none';
+    updateHud();
+    setTimeout(()=> overOverlay.classList.remove('hidden'), 500);
+  }
+
+  startOverlay.addEventListener('click', startGame);
+  overOverlay.addEventListener('click', startGame);
+
+  // ---------- Update ----------
+  function update(dt){
+    const boosting = keys.boost && fuel > 0;
+    const speedMult = boosting ? BOOST_MULT : 1;
+    baseScrollSpeed = Math.min(150 + altitude*0.018, 420);
+    const scrollSpeed = baseScrollSpeed * speedMult;
+    altitude += scrollSpeed * dt * 0.16;
+
+    // steering: normal arrow-key control, or chaotic drift while out of control
+    const empInverting = emp.active && emp.t >= EMP_WARN;
+    if(rocket.outOfControl > 0){
+      rocket.outOfControl -= dt;
+      rocket.vx += (Math.random()-0.5) * 2200 * dt;
+      rocket.vx = Math.max(-MAX_VX*1.5, Math.min(MAX_VX*1.5, rocket.vx));
+      rocket.spin += dt * 16;
+      shake = Math.max(shake, 5);
+      if(rocket.outOfControl <= 0){ rocket.outOfControl = 0; rocket.spin = 0; }
+    } else {
+      const leftHeld = empInverting ? keys.right : keys.left;
+      const rightHeld = empInverting ? keys.left : keys.right;
+      if(leftHeld && !rightHeld) rocket.vx -= ACCEL*dt;
+      else if(rightHeld && !leftHeld) rocket.vx += ACCEL*dt;
+      else rocket.vx *= Math.exp(-DRAG*dt);
+      rocket.vx = Math.max(-MAX_VX, Math.min(MAX_VX, rocket.vx));
+    }
+
+    rocket.x += rocket.vx*dt;
+
+    const minX = rocket.radius+8, maxX = W-rocket.radius-8;
+    if(rocket.x < minX){ rocket.x = minX; rocket.vx = Math.max(0, rocket.vx); }
+    if(rocket.x > maxX){ rocket.x = maxX; rocket.vx = Math.min(0, rocket.vx); }
+
+    rocket.bank = Math.max(-0.38, Math.min(0.38, rocket.vx/MAX_VX*0.4));
+
+    if(rocket.invulnerable>0) rocket.invulnerable -= dt;
+
+    // fuel drain
+    fuel -= (FUEL_DRAIN_PER_SEC + (boosting?BOOST_EXTRA_DRAIN:0)) * dt;
+    if(fuel <= 0){ fuel = 0; updateHud(); endGame('fuel'); return; }
+
+    // hull regen
+    timeSinceHit += dt;
+    if(timeSinceHit>HULL_REGEN_DELAY && hull<HULL_MAX){ hull = Math.min(HULL_MAX, hull+HULL_REGEN_RATE*dt); }
+
+    // trailing embers — small sparks drifting off the main flame cone
+    if(Math.random() < (boosting ? 0.9 : 0.55)){
+      flame.push({
+        x: rocket.x + (Math.random()-0.5)*8 - rocket.bank*12,
+        y: rocket.y + (boosting?36:26),
+        vy: (boosting?120:70)+Math.random()*40,
+        vx: (Math.random()-0.5)*24,
+        life: 0.26+Math.random()*0.12, maxLife: 0.38,
+        r: (boosting?2.2:1.6)+Math.random()*1.4,
+        boost: boosting
+      });
+    }
+    flame.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; });
+    flame = flame.filter(p=>p.life>0);
+
+    // motion trail — a smooth tapering streak of recent rocket positions
+    rocket.trailPoints.unshift({ x: rocket.x, y: rocket.y });
+    if(rocket.trailPoints.length > 14) rocket.trailPoints.pop();
+
+    // spawn obstacles
+    spawnTimer += dt;
+    spawnInterval = Math.max(0.55, 1.15-altitude/6000) / speedMult;
+    if(spawnTimer >= spawnInterval){ spawnTimer = 0; spawnPattern(altitude, scrollSpeed); }
+
+    // spawn fuel — interval tightens automatically as your tank gets low,
+    // so a pickup is always on the way well before you'd actually run dry
+    fuelTimer += dt;
+    fuelInterval = Math.min(11, 5 + altitude/1100);
+    if(fuel < 45) fuelInterval = Math.min(fuelInterval, 3.4);
+    if(fuel < 25) fuelInterval = Math.min(fuelInterval, 1.7);
+    if(fuelTimer >= fuelInterval){ fuelTimer = 0; spawnFuel(); }
+
+    // obstacles
+    for(let i=obstacles.length-1;i>=0;i--){
+      const o = obstacles[i];
+      o.x += o.vx*dt; o.y += o.vy*dt; o.rotation += o.rotSpeed*dt;
+
+      if(!o.resolved && rocket.invulnerable<=0){
+        const d = Math.hypot(o.x-rocket.x, o.y-rocket.y);
+        if(d < o.radius+rocket.radius-4){
+          o.resolved = true; hits++; hull -= o.damage; timeSinceHit = 0;
+          rocket.invulnerable = 1.1; shake = Math.min(shake+10,18);
+          spawnBurst(o.x,o.y); obstacles.splice(i,1); updateHud();
+          if(hull<=0){ endGame('hull'); return; }
+          continue;
+        }
+      }
+      if(o.y > H+80 || o.x < -120 || o.x > W+120){
+        if(!o.resolved) dodges++;
+        obstacles.splice(i,1);
+      }
+    }
+
+    // fuel pickups
+    if(rocket.magnetTime > 0) rocket.magnetTime -= dt;
+
+    for(let i=fuels.length-1;i>=0;i--){
+      const f = fuels[i];
+      f.vy = scrollSpeed;
+
+      if(rocket.magnetTime > 0){
+        const dx = rocket.x - f.x, dy = rocket.y - f.y;
+        const dist = Math.hypot(dx,dy) || 1;
+        if(dist < MAGNET_RADIUS){
+          const pull = MAGNET_PULL * (1 - dist/MAGNET_RADIUS);
+          f.x += (dx/dist) * pull * dt;
+          f.y += (dy/dist) * pull * dt;
+        }
+      }
+
+      f.y += f.vy*dt; f.pulse += dt*4;
+      const d = Math.hypot(f.x-rocket.x, f.y-rocket.y);
+      if(d < f.radius+rocket.radius){
+        fuel = Math.min(FUEL_MAX, fuel + FUEL_MAX*0.34);
+        spawnSparkles(f.x,f.y);
+        fuels.splice(i,1);
+        continue;
+      }
+      if(f.y > H+60) fuels.splice(i,1);
+    }
+
+    // spawn magnets — rare pickup
+    magnetTimer += dt;
+    if(magnetTimer >= magnetInterval){
+      magnetTimer = 0;
+      magnetInterval = 28 + Math.random()*16;
+      spawnMagnet();
+    }
+    for(let i=magnets.length-1;i>=0;i--){
+      const m = magnets[i];
+      m.y += scrollSpeed*dt;
+      m.pulse += dt*4;
+      const d = Math.hypot(m.x-rocket.x, m.y-rocket.y);
+      if(d < m.radius+rocket.radius){
+        rocket.magnetTime = MAGNET_DURATION;
+        spawnSparkles(m.x,m.y);
+        magnets.splice(i,1);
+        continue;
+      }
+      if(m.y > H+60) magnets.splice(i,1);
+    }
+
+    // spawn black holes — rare, big set-piece hazard; only one at a time
+    if(altitude > 1400 && blackholes.length === 0){
+      blackHoleTimer += dt;
+      if(blackHoleTimer >= blackHoleInterval){
+        blackHoleTimer = 0;
+        blackHoleInterval = 22 + Math.random()*10;
+        spawnBlackHole(scrollSpeed);
+      }
+    }
+
+    // black holes: drift down with a gentle natural wobble, spin the
+    // rocket out for a few seconds on contact with the dark core
+    for(let i=blackholes.length-1;i>=0;i--){
+      const b = blackholes[i];
+      b.age += dt;
+      b.y += b.vy*dt;
+      b.swirl += dt*0.6;
+      b.x = b.baseX + Math.sin(b.age*0.55)*10;
+
+      if(!b.resolved && rocket.invulnerable<=0 && rocket.outOfControl<=0){
+        const d = Math.hypot(b.x-rocket.x, b.y-rocket.y);
+        if(d < b.radius*0.6 + rocket.radius - 4){
+          b.resolved = true;
+          rocket.outOfControl = 3;
+          fuel = Math.max(0, fuel - FUEL_MAX*0.12);
+          spawnBurst(b.x, b.y);
+          controlBanner.classList.add('show');
+          setTimeout(()=> controlBanner.classList.remove('show'), 2600);
+          blackholes.splice(i,1);
+          updateHud();
+          if(fuel <= 0){ endGame('fuel'); return; }
+          continue;
+        }
+      }
+      if(b.y > H+b.radius*1.6) blackholes.splice(i,1);
+    }
+
+    // wormholes — dodgeable, but flying through one instantly warps
+    // the rocket to a random x on screen
+    if(altitude > 1000){
+      wormHoleTimer += dt;
+      if(wormHoleTimer >= wormHoleInterval){
+        wormHoleTimer = 0;
+        wormHoleInterval = 13 + Math.random()*9;
+        spawnWormhole(scrollSpeed);
+      }
+    }
+
+    for(let i=wormholes.length-1;i>=0;i--){
+      const wh = wormholes[i];
+      wh.y += wh.vy*dt;
+      wh.swirl += dt*3.2;
+
+      if(!wh.resolved && rocket.invulnerable<=0 && rocket.outOfControl<=0){
+        const d = Math.hypot(wh.x-rocket.x, wh.y-rocket.y);
+        if(d < wh.radius*0.62 + rocket.radius - 3){
+          wh.resolved = true;
+          spawnBurst(rocket.x, rocket.y);
+          const oldX = rocket.x;
+          const minTx = rocket.radius+8, maxTx = W-rocket.radius-8;
+          rocket.x = minTx + Math.random()*(maxTx-minTx);
+          rocket.vx = 0;
+          rocket.invulnerable = 0.6;
+          spawnBurst(rocket.x, rocket.y);
+          warpFlash = { x: oldX, y: rocket.y, tx: rocket.x, ty: rocket.y, t: 0 };
+          wormholes.splice(i,1);
+          continue;
+        }
+      }
+      if(wh.y > H+wh.radius*1.6) wormholes.splice(i,1);
+    }
+
+    if(warpFlash){
+      warpFlash.t += dt;
+      if(warpFlash.t > 0.5) warpFlash = null;
+    }
+
+    if(rocket.outOfControl > 0) shake = Math.max(shake, 5);
+
+    // lightning storms — whole-screen, unavoidable by design; the only
+    // cost is a temporary blur, so the danger is flying half-blind
+    // through whatever asteroids happen to be on screen
+    let stormBlurPx = 0;
+    if(!storm.active){
+      stormTimer += dt;
+      if(altitude > 700 && stormTimer >= stormInterval){
+        stormTimer = 0;
+        stormInterval = 24 + Math.random()*16;
+        storm.active = true;
+        storm.t = 0;
+      }
+    } else {
+      storm.t += dt;
+      if(storm.t < STORM_WARN){
+        stormBlurPx = 0;
+      } else if(storm.t < STORM_WARN + STORM_FLASH){
+        stormBlurPx = STORM_MAX_BLUR*0.35;
+      } else {
+        const blurElapsed = storm.t - (STORM_WARN + STORM_FLASH);
+        const blurT = Math.min(1, blurElapsed / STORM_BLUR);
+        stormBlurPx = STORM_MAX_BLUR * (1 - blurT);
+      }
+      if(storm.t >= STORM_TOTAL){
+        storm.active = false;
+        stormBlurPx = 0;
+      }
+    }
+
+    // nebula blast — a single scripted event at 3000m. Almost always fatal.
+    let nebulaBlurPx = 0;
+    if(!nebulaTriggered && altitude >= NEBULA_TRIGGER_ALT){
+      nebulaTriggered = true;
+      nebula.active = true;
+      nebula.t = 0;
+      nebula.resolved = false;
+      nebula.survived = false;
+    }
+    if(nebula.active){
+      nebula.t += dt;
+      shake = Math.max(shake, Math.min(22, nebula.t*11));
+
+      const resolveAt = NEBULA_WARN + NEBULA_EXPAND;
+      if(!nebula.resolved && nebula.t >= resolveAt){
+        nebula.resolved = true;
+        nebula.survived = Math.random() < NEBULA_ESCAPE_CHANCE;
+        if(nebula.survived){
+          nebulaBanner.classList.add('show');
+          setTimeout(()=> nebulaBanner.classList.remove('show'), 2600);
+        } else {
+          endGame('nebula');
+          return;
+        }
+      }
+
+      if(nebula.t < resolveAt){
+        nebulaBlurPx = Math.min(7, (nebula.t/resolveAt) * 7);
+      } else {
+        const outroT = Math.min(1, (nebula.t - resolveAt) / NEBULA_OUTRO);
+        nebulaBlurPx = 7 * (1 - outroT);
+        if(nebula.t >= resolveAt + NEBULA_OUTRO) nebula.active = false;
+      }
+    }
+
+    // EMP shockwave — a single scripted event at 9000m. Inverts steering
+    // and glitches the screen/HUD for a few seconds. Not fatal, just irritating.
+    if(!empTriggered && altitude >= EMP_TRIGGER_ALT){
+      empTriggered = true;
+      emp.active = true;
+      emp.t = 0;
+      empBanner.classList.add('show');
+      setTimeout(()=> empBanner.classList.remove('show'), 2600);
+    }
+    let empGlitching = false;
+    if(emp.active){
+      emp.t += dt;
+      if(emp.t >= EMP_WARN){
+        empGlitching = true;
+        shake = Math.max(shake, 3);
+        hudEl.style.opacity = Math.random() < 0.1 ? '0.35' : '1';
+      }
+      if(emp.t >= EMP_TOTAL){
+        emp.active = false;
+        empGlitching = false;
+        hudEl.style.opacity = '1';
+      }
+    }
+
+    const combinedBlur = Math.max(stormBlurPx, nebulaBlurPx);
+    canvas.style.filter = combinedBlur > 0.05 ? `blur(${combinedBlur.toFixed(2)}px)` : '';
+
+    bursts.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; p.vx*=0.94; p.vy*=0.94; });
+    bursts = bursts.filter(p=>p.life>0);
+    sparkles.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; });
+    sparkles = sparkles.filter(p=>p.life>0);
+
+    if(boosting){
+      speedLines.forEach(s=>{ s.y += scrollSpeed*dt*1.4; if(s.y>H){ s.y=-s.len; s.x=Math.random()*W; } });
+    }
+
+    if(shake>0) shake = Math.max(0, shake-dt*40);
+
+    maybeShowLayerBanner();
+    updateHud();
+  }
+
+  function spawnBurst(x,y){
+    for(let i=0;i<14;i++){ const a=Math.random()*Math.PI*2, spd=60+Math.random()*140;
+      bursts.push({ x,y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:0.5+Math.random()*0.3, maxLife:0.8, r:2+Math.random()*3 }); }
+  }
+  function spawnSparkles(x,y){
+    for(let i=0;i<10;i++){ const a=Math.random()*Math.PI*2, spd=30+Math.random()*80;
+      sparkles.push({ x,y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:0.5, maxLife:0.5, r:2+Math.random()*2 }); }
+  }
+
+  // ---------- Render ----------
+  function drawBackground(alt, time){
+    const colors = getSkyColors(alt);
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0, colors.top); g.addColorStop(1, colors.bottom);
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+    const w = getWeights(alt);
+    const starAlpha = 1-w.tropo;
+    if(starAlpha>0.02){
+      for(const s of stars){
+        const tw = 0.5+0.5*Math.sin(time*0.001*s.speed+s.phase);
+        ctx.globalAlpha = tw*starAlpha*0.9;
+        ctx.fillStyle = '#eef9f8';
+        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if(w.meso>0.05){
+      ctx.globalAlpha = w.meso*0.35;
+      for(let i=0;i<3;i++){
+        const yy = H*0.15+i*60+Math.sin(time*0.0006+i)*20;
+        const grad = ctx.createLinearGradient(0,yy-30,0,yy+30);
+        grad.addColorStop(0,'rgba(140,255,220,0)');
+        grad.addColorStop(0.5,'rgba(140,255,220,0.5)');
+        grad.addColorStop(1,'rgba(140,255,220,0)');
+        ctx.fillStyle = grad; ctx.fillRect(0,yy-30,W,60);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if(w.tropo>0.02){
+      ctx.globalAlpha = w.tropo*0.5;
+      ctx.fillStyle = '#ffffff';
+      for(const c of clouds){
+        ctx.beginPath(); ctx.ellipse(c.x,c.y,c.w/2,c.h/2,0,0,Math.PI*2); ctx.fill();
+        c.y += c.speed*baseScrollSpeed*0.016;
+        if(c.y-c.h>H){ c.y=-c.h; c.x=Math.random()*W; }
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawSpeedLines(boosting){
+    if(!boosting) return;
+    ctx.strokeStyle = 'rgba(207,255,251,0.35)';
+    ctx.lineWidth = 1.4;
+    for(const s of speedLines){
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x, s.y - s.len);
+      ctx.stroke();
+    }
+  }
+
+  // A smooth tapering streak connecting the rocket's recent positions.
+  function drawMotionTrail(){
+    const pts = rocket.trailPoints;
+    if(pts.length < 2) return;
+    const n = pts.length;
+    for(let i=0;i<n-1;i++){
+      const t = i/n;
+      ctx.strokeStyle = `rgba(127,232,224,${(1-t)*0.3})`;
+      ctx.lineWidth = Math.max(0.6, (1-t)*6);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x, pts[i].y);
+      ctx.lineTo(pts[i+1].x, pts[i+1].y);
+      ctx.stroke();
+    }
+  }
+
+  function drawFlame(){
+    for(const p of flame){
+      const a = p.life/p.maxLife;
+      ctx.globalAlpha = a*(fuel>0?1:0.2);
+      const inner = p.boost ? 'rgba(255,225,170,0.95)' : 'rgba(255,196,120,0.9)';
+      const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*3);
+      g.addColorStop(0, inner); g.addColorStop(1, 'rgba(255,196,120,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*3,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // A more detailed rocket: nose cone, body, window, fins, engine nozzle.
+  function drawRocket(boosting){
+    if(rocket.invulnerable>0 && Math.floor(rocket.invulnerable*10)%2===0) return;
+    ctx.save();
+    ctx.translate(rocket.x, rocket.y);
+    ctx.rotate(rocket.outOfControl > 0 ? rocket.spin : rocket.bank);
+    ctx.scale(1.25, 1.25);
+    ctx.shadowColor = rocket.outOfControl > 0 ? 'rgba(199,146,255,0.6)' : 'rgba(127,232,224,0.55)';
+    ctx.shadowBlur = boosting ? 26 : 16;
+
+    // fins (drawn first, behind body)
+    ctx.beginPath();
+    ctx.moveTo(-5, 6);
+    ctx.lineTo(-15, 20);
+    ctx.lineTo(-4, 15);
+    ctx.closePath();
+    ctx.moveTo(5, 6);
+    ctx.lineTo(15, 20);
+    ctx.lineTo(4, 15);
+    ctx.closePath();
+    ctx.fillStyle = '#ffb454';
+    ctx.fill();
+
+    // engine nozzle
+    ctx.beginPath();
+    ctx.moveTo(-4, 14);
+    ctx.lineTo(4, 14);
+    ctx.lineTo(3, 20);
+    ctx.lineTo(-3, 20);
+    ctx.closePath();
+    ctx.fillStyle = '#3a3f52';
+    ctx.fill();
+
+    // body (rounded cylinder)
+    ctx.beginPath();
+    ctx.moveTo(-7, 14);
+    ctx.lineTo(-7, -6);
+    ctx.quadraticCurveTo(-7, -10, -4, -10);
+    ctx.lineTo(4, -10);
+    ctx.quadraticCurveTo(7, -10, 7, -6);
+    ctx.lineTo(7, 14);
+    ctx.quadraticCurveTo(0, 17, -7, 14);
+    ctx.closePath();
+    const bodyGrad = ctx.createLinearGradient(-7, -10, 7, 14);
+    bodyGrad.addColorStop(0, '#f4fbfa');
+    bodyGrad.addColorStop(1, '#aebdc9');
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(4,6,12,0.15)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // nose cone
+    ctx.beginPath();
+    ctx.moveTo(-4, -10);
+    ctx.quadraticCurveTo(0, -26, 4, -10);
+    ctx.closePath();
+    const noseGrad = ctx.createLinearGradient(0, -26, 0, -10);
+    noseGrad.addColorStop(0, '#cffffb');
+    noseGrad.addColorStop(1, '#7fe8e0');
+    ctx.fillStyle = noseGrad;
+    ctx.fill();
+
+    // window
+    ctx.beginPath();
+    ctx.arc(0, -1, 3.4, 0, Math.PI*2);
+    ctx.fillStyle = '#274654';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-1, -2, 1.3, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(238,249,248,0.8)';
+    ctx.fill();
+
+    // engine flame — flickering outer cone, hot white inner core
+    const fuelFactor = fuel > 0 ? 1 : 0.18;
+    const flicker = 0.86 + Math.random()*0.28;
+    const len = (boosting ? 32 : 18) * flicker * fuelFactor;
+    const wob = (Math.random()-0.5) * 3;
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = fuelFactor;
+
+    ctx.beginPath();
+    ctx.moveTo(-4.2, 14);
+    ctx.quadraticCurveTo(-2+wob*0.3, 14+len*0.55, wob, 14+len);
+    ctx.quadraticCurveTo(2+wob*0.3, 14+len*0.55, 4.2, 14);
+    ctx.closePath();
+    const outerGrad = ctx.createLinearGradient(0,14,0,14+len);
+    outerGrad.addColorStop(0, boosting ? '#ffffff' : '#ffe3b0');
+    outerGrad.addColorStop(0.4, boosting ? '#a9f2ff' : '#ffb454');
+    outerGrad.addColorStop(1, 'rgba(127,232,224,0)');
+    ctx.fillStyle = outerGrad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-1.6, 14);
+    ctx.quadraticCurveTo(wob*0.3, 14+len*0.6, wob*0.5, 14+len*0.72);
+    ctx.quadraticCurveTo(wob*0.3+1.6, 14+len*0.6, 1.6, 14);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  function drawObstacles(){
+    for(const o of obstacles){
+      ctx.save();
+      ctx.translate(o.x,o.y); ctx.rotate(o.rotation);
+      ctx.beginPath();
+      o.shape.forEach((pt,i)=>{ const px=Math.cos(pt.a)*pt.r, py=Math.sin(pt.a)*pt.r; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); });
+      ctx.closePath();
+      const g = ctx.createLinearGradient(-o.radius,-o.radius,o.radius,o.radius);
+      g.addColorStop(0,'#7d8296'); g.addColorStop(1,'#33364a');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(238,249,248,0.08)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // A large, natural-feeling gravity well — layered nebula glow, tilted
+  // rotating rings of debris, drifting dust, and a soft dark core.
+  function drawBlackHoles(){
+    for(const b of blackholes){
+      ctx.save();
+      ctx.translate(b.x,b.y);
+
+      // outer nebula haze — soft, irregular via two offset gradients
+      const haze = ctx.createRadialGradient(0,0,b.radius*0.4,0,0,b.radius*2.1);
+      haze.addColorStop(0,'rgba(130,70,220,0.22)');
+      haze.addColorStop(0.6,'rgba(90,40,170,0.1)');
+      haze.addColorStop(1,'rgba(90,40,170,0)');
+      ctx.fillStyle = haze;
+      ctx.beginPath(); ctx.arc(0,0,b.radius*2.1,0,Math.PI*2); ctx.fill();
+
+      // drifting dust motes caught in orbit
+      const dustCount = 22;
+      for(let i=0;i<dustCount;i++){
+        const a = (i/dustCount)*Math.PI*2 + b.swirl*1.6;
+        const orbitR = b.radius*(0.85 + 0.5*((i*37)%10)/10);
+        const squash = 0.34;
+        const dx = Math.cos(a)*orbitR;
+        const dy = Math.sin(a)*orbitR*squash;
+        const depth = Math.sin(a)*0.5+0.5;
+        ctx.globalAlpha = 0.18 + depth*0.35;
+        ctx.fillStyle = i%3===0 ? '#c792ff' : (i%3===1 ? '#7fe8e0' : '#eef9f8');
+        const dr = 1 + depth*1.6;
+        ctx.beginPath(); ctx.arc(dx,dy,dr,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // tilted accretion rings, each rotating at a slightly different rate
+      const ringSpecs = [
+        { rx:1.5, ry:0.5, rot: b.swirl,       color:'rgba(199,146,255,0.5)', w:3 },
+        { rx:1.22,ry:0.4, rot: -b.swirl*1.3,  color:'rgba(127,232,224,0.4)', w:2 },
+        { rx:1.0, ry:0.32,rot: b.swirl*0.8,   color:'rgba(255,255,255,0.28)',w:1.4 }
+      ];
+      for(const spec of ringSpecs){
+        ctx.save();
+        ctx.rotate(spec.rot*0.2);
+        ctx.strokeStyle = spec.color;
+        ctx.lineWidth = spec.w;
+        ctx.beginPath();
+        ctx.ellipse(0,0, b.radius*spec.rx, b.radius*spec.ry, 0, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // soft inner glow ring right at the edge of the core
+      const rim = ctx.createRadialGradient(0,0,b.radius*0.42,0,0,b.radius*0.62);
+      rim.addColorStop(0,'rgba(199,146,255,0)');
+      rim.addColorStop(1,'rgba(199,146,255,0.45)');
+      ctx.fillStyle = rim;
+      ctx.beginPath(); ctx.arc(0,0,b.radius*0.62,0,Math.PI*2); ctx.fill();
+
+      // event horizon core
+      const core = ctx.createRadialGradient(-b.radius*0.1,-b.radius*0.1,0,0,0,b.radius*0.46);
+      core.addColorStop(0,'#150a24');
+      core.addColorStop(1,'#03020a');
+      ctx.fillStyle = core;
+      ctx.beginPath(); ctx.arc(0,0,b.radius*0.46,0,Math.PI*2); ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  function roundRectPath(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y);
+    ctx.closePath();
+  }
+
+  // A jerry-can style fuel pickup: body, cap handle, spout, drop emblem.
+  function drawFuels(){
+    for(const f of fuels){
+      const pulse = 1+Math.sin(f.pulse)*0.1;
+      const s = f.radius*pulse;
+      ctx.save();
+      ctx.translate(f.x,f.y);
+      ctx.shadowColor = 'rgba(200,242,107,0.75)';
+      ctx.shadowBlur = 16;
+
+      const bw = s*1.5, bh = s*1.7;
+
+      // handle
+      ctx.beginPath();
+      ctx.moveTo(-bw*0.24, -bh/2);
+      ctx.lineTo(-bw*0.24, -bh/2 - s*0.55);
+      ctx.lineTo(bw*0.24, -bh/2 - s*0.55);
+      ctx.lineTo(bw*0.24, -bh/2);
+      ctx.strokeStyle = '#2b2e22';
+      ctx.lineWidth = s*0.3;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // spout
+      roundRectPath(bw*0.28, -bh/2 - s*0.28, s*0.32, s*0.4, s*0.08);
+      ctx.fillStyle = '#2b2e22';
+      ctx.fill();
+
+      // can body
+      roundRectPath(-bw/2, -bh/2, bw, bh, s*0.28);
+      const bodyGrad = ctx.createLinearGradient(0,-bh/2,0,bh/2);
+      bodyGrad.addColorStop(0, '#eaff9e');
+      bodyGrad.addColorStop(1, '#b7e857');
+      ctx.fillStyle = bodyGrad;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(43,46,34,0.55)';
+      ctx.lineWidth = s*0.09;
+      ctx.stroke();
+
+      // horizontal rib line
+      ctx.beginPath();
+      ctx.moveTo(-bw/2 + s*0.1, 0);
+      ctx.lineTo(bw/2 - s*0.1, 0);
+      ctx.strokeStyle = 'rgba(43,46,34,0.35)';
+      ctx.lineWidth = s*0.08;
+      ctx.stroke();
+
+      // fuel drop emblem
+      ctx.beginPath();
+      ctx.moveTo(0, -s*0.32);
+      ctx.quadraticCurveTo(s*0.26, s*0.05, 0, s*0.4);
+      ctx.quadraticCurveTo(-s*0.26, s*0.05, 0, -s*0.32);
+      ctx.fillStyle = 'rgba(43,46,34,0.4)';
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  // A swirling energetic portal — brighter and tighter than the black
+  // hole's slow gravity well, with particles spiraling inward.
+  function drawWormholes(){
+    for(const wh of wormholes){
+      ctx.save();
+      ctx.translate(wh.x, wh.y);
+
+      const glow = ctx.createRadialGradient(0,0,wh.radius*0.2,0,0,wh.radius*1.6);
+      glow.addColorStop(0,'rgba(120,200,255,0.4)');
+      glow.addColorStop(1,'rgba(120,200,255,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0,0,wh.radius*1.6,0,Math.PI*2); ctx.fill();
+
+      // spiral arms feeding inward
+      for(let arm=0; arm<3; arm++){
+        ctx.beginPath();
+        const armOffset = (arm/3)*Math.PI*2;
+        for(let s=0; s<=18; s++){
+          const t = s/18;
+          const a = wh.swirl*1.4 + armOffset + t*Math.PI*2.4;
+          const r = wh.radius*(1 - t*0.85);
+          const px = Math.cos(a)*r, py = Math.sin(a)*r;
+          if(s===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+        }
+        ctx.strokeStyle = arm%2===0 ? 'rgba(207,255,251,0.55)' : 'rgba(150,190,255,0.4)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // bright rim ring
+      ctx.strokeStyle = 'rgba(230,250,255,0.75)';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0,0,wh.radius*0.95,0,Math.PI*2);
+      ctx.stroke();
+
+      // white-hot core
+      const core = ctx.createRadialGradient(0,0,0,0,0,wh.radius*0.42);
+      core.addColorStop(0,'#ffffff');
+      core.addColorStop(0.5,'#cffffb');
+      core.addColorStop(1,'rgba(127,232,224,0.15)');
+      ctx.fillStyle = core;
+      ctx.beginPath(); ctx.arc(0,0,wh.radius*0.42,0,Math.PI*2); ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  function drawWarpFlash(){
+    if(!warpFlash) return;
+    const p = Math.min(1, warpFlash.t/0.5);
+    const alpha = 1-p;
+
+    for(const pt of [{x:warpFlash.x,y:warpFlash.y},{x:warpFlash.tx,y:warpFlash.ty}]){
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = 'rgba(207,255,251,0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 6 + p*34, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Horseshoe-magnet pickup icon — red and blue poles, small glowing gap.
+  function drawMagnets(){
+    for(const m of magnets){
+      const pulse = 1 + Math.sin(m.pulse)*0.1;
+      const s = m.radius*pulse;
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.shadowColor = 'rgba(255,150,150,0.6)';
+      ctx.shadowBlur = 14;
+
+      ctx.lineWidth = s*0.42;
+      ctx.lineCap = 'round';
+
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.beginPath();
+      ctx.arc(0, s*0.05, s*0.55, Math.PI*0.15, Math.PI*1.0);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#7fb8ff';
+      ctx.beginPath();
+      ctx.arc(0, s*0.05, s*0.55, Math.PI*1.0, Math.PI*1.85);
+      ctx.stroke();
+
+      // pole caps
+      ctx.fillStyle = '#eef9f8';
+      ctx.fillRect(-s*0.55-s*0.06, s*0.05-s*0.16, s*0.24, s*0.22);
+      ctx.fillRect(s*0.55-s*0.18, s*0.05-s*0.16, s*0.24, s*0.22);
+
+      ctx.restore();
+    }
+  }
+
+  function drawMagnetField(){
+    if(rocket.magnetTime <= 0) return;
+    const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.006);
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,150,150,${0.12 + pulse*0.1})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(rocket.x, rocket.y, MAGNET_RADIUS*(0.85+pulse*0.1), 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawParticles(list, color){
+    for(const p of list){
+      const a = p.life/p.maxLife;
+      ctx.globalAlpha = a; ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawControlVignette(){
+    if(rocket.outOfControl <= 0) return;
+    const alpha = Math.min(0.32, (rocket.outOfControl/3) * 0.32);
+    const g = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.25,W/2,H/2,Math.max(W,H)*0.7);
+    g.addColorStop(0,'rgba(150,90,255,0)');
+    g.addColorStop(1,`rgba(120,40,220,${alpha})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  function drawJaggedBolt(xStart){
+    const segments = 11;
+    let x = xStart, y = -20;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    for(let i=1;i<=segments;i++){
+      y = (H+40) * (i/segments) - 20;
+      x += (Math.random()-0.5) * 70;
+      ctx.lineTo(x,y);
+    }
+    ctx.lineWidth = 2 + Math.random()*2.5;
+    ctx.strokeStyle = 'rgba(238,249,248,0.95)';
+    ctx.shadowColor = 'rgba(199,146,255,0.9)';
+    ctx.shadowBlur = 24;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawLightning(){
+    if(!storm.active) return;
+
+    if(storm.t < STORM_WARN){
+      // distant flicker builds tension before the real strike
+      const flicker = Math.max(0, Math.sin(storm.t*26)) * 0.09;
+      ctx.fillStyle = `rgba(190,200,255,${flicker})`;
+      ctx.fillRect(0,0,W,H);
+    } else if(storm.t < STORM_WARN + STORM_FLASH){
+      const flashT = (storm.t - STORM_WARN) / STORM_FLASH;
+      const flashAlpha = 0.55 * (1 - flashT);
+
+      const boltCount = 4 + Math.floor(Math.random()*3);
+      for(let i=0;i<boltCount;i++){
+        drawJaggedBolt(60 + Math.random()*(W-120));
+      }
+
+      ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
+      ctx.fillRect(0,0,W,H);
+    }
+  }
+
+  function drawNebulaBlast(){
+    if(!nebula.active) return;
+
+    const resolveAt = NEBULA_WARN + NEBULA_EXPAND;
+
+    if(nebula.t < NEBULA_WARN){
+      // a single point of light building at the center of the sky
+      const p = nebula.t / NEBULA_WARN;
+      const r = 4 + p*46;
+      const g = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,r);
+      g.addColorStop(0,'rgba(255,255,255,0.95)');
+      g.addColorStop(1,'rgba(255,120,220,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(W/2,H/2,r,0,Math.PI*2); ctx.fill();
+      return;
+    }
+
+    let alpha = 1;
+    let p;
+    if(nebula.t < resolveAt){
+      p = (nebula.t - NEBULA_WARN) / NEBULA_EXPAND;
+    } else {
+      p = 1;
+      if(nebula.survived){
+        const outroT = Math.min(1, (nebula.t - resolveAt) / NEBULA_OUTRO);
+        alpha = 1 - outroT;
+      }
+    }
+
+    const maxR = Math.hypot(W,H) * 0.78;
+    const r = 12 + p*maxR;
+
+    ctx.globalAlpha = alpha;
+
+    const g = ctx.createRadialGradient(W/2,H/2, r*0.04, W/2,H/2, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.addColorStop(0.22,'rgba(255,150,225,0.85)');
+    g.addColorStop(0.5, 'rgba(190,90,255,0.7)');
+    g.addColorStop(0.78,'rgba(110,40,190,0.45)');
+    g.addColorStop(1, 'rgba(80,20,150,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(W/2,H/2, Math.min(r, maxR*0.98), 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+  }
+
+  function drawEmpGlitch(){
+    if(!emp.active) return;
+
+    if(emp.t < EMP_WARN){
+      // the pulse itself — a fast electric-blue shockwave ring
+      const p = emp.t / EMP_WARN;
+      const maxR = Math.hypot(W,H) * 0.7;
+      const r = 6 + p*maxR;
+      ctx.save();
+      ctx.globalAlpha = 1 - p*0.4;
+      ctx.strokeStyle = 'rgba(207,255,251,0.85)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(rocket.x, rocket.y, r, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(127,232,224,0.4)';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(rocket.x, rocket.y, r*0.9, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    // flickering static bands — irritating on purpose
+    if(Math.random() < 0.65){
+      const bandCount = 2 + Math.floor(Math.random()*3);
+      for(let i=0;i<bandCount;i++){
+        const y = Math.random()*H;
+        const h = 2 + Math.random()*10;
+        ctx.fillStyle = `rgba(238,249,248,${0.05+Math.random()*0.12})`;
+        ctx.fillRect(0, y, W, h);
+      }
+    }
+
+    // subtle RGB-split shimmer around the edges
+    if(Math.random() < 0.3){
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fillRect(-3,0,W,H);
+      ctx.fillStyle = '#7fe8e0';
+      ctx.fillRect(3,0,W,H);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function render(time){
+    const boosting = keys.boost && fuel > 0 && running;
+    ctx.save();
+    if(shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    drawBackground(altitude, time);
+    drawSpeedLines(boosting);
+    drawMotionTrail();
+    drawFlame();
+    drawObstacles();
+    drawBlackHoles();
+    drawWormholes();
+    drawMagnets();
+    drawFuels();
+    drawMagnetField();
+    drawParticles(bursts, '#9a9dbd');
+    drawParticles(sparkles, '#c8f26b');
+    drawRocket(boosting);
+    drawWarpFlash();
+    drawControlVignette();
+    drawLightning();
+    drawNebulaBlast();
+    drawEmpGlitch();
+    ctx.restore();
+  }
+
+  function loop(now){
+    const dt = Math.min((now-last)/1000, 0.05);
+    last = now;
+    if(running) update(dt);
+    render(now);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  resetRocket();
+  controlsRow.style.opacity = '0';
+})();
+</script>
+
+</body>
+</html>
